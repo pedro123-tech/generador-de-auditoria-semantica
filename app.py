@@ -149,19 +149,19 @@ if generar:
         todos = [cliente] + competidores
         n_dom = sum(1 for etq, url in todos if etq and url)
 
-        # Freno de gasto compartido: antes de lanzar ninguna peticion cara,
-        # se estima el coste maximo y se compara con (a) el tope configurado
-        # para una sola ejecucion y (b) las unidades que de verdad quedan
-        # este mes en la cuenta de Ahrefs. Evita que una ejecución grande
-        # agote la cuota mensual compartida por todo el equipo sin avisar.
+        # Aviso de gasto (NO bloquea, solo informa): antes de lanzar las
+        # peticiones se estima el coste maximo y se compara con (a) el umbral
+        # configurado y (b) las unidades que de verdad quedan este mes en la
+        # cuenta de Ahrefs. Por decision explicita del usuario, esto nunca
+        # detiene la ejecucion — solo avisa para que se pueda decidir con
+        # informacion, ya que el limite de keywords lo controla el propio
+        # usuario y es su cuota la que está en juego.
         coste_estimado = limite_efectivo * n_dom * ahrefs.UNIDADES_POR_KEYWORD
         if coste_estimado > MAX_UNITS_PER_RUN:
-            st.error(
+            st.warning(
                 f"Esta ejecución podría consumir hasta ~{coste_estimado:,} "
-                f"unidades de Ahrefs, por encima del tope configurado para una "
-                f"sola ejecución ({MAX_UNITS_PER_RUN:,}). Reduce el máximo de "
-                "keywords.")
-            st.stop()
+                f"unidades de Ahrefs (umbral de aviso: {MAX_UNITS_PER_RUN:,}). "
+                "Continuando de todas formas.")
 
         try:
             cuota = ahrefs.unidades_disponibles(AHREFS_KEY)
@@ -172,12 +172,10 @@ if generar:
             restante = None
 
         if restante is not None and coste_estimado > restante:
-            st.error(
+            st.warning(
                 f"Esta auditoría podría necesitar hasta ~{coste_estimado:,} "
                 f"unidades y solo quedan {restante:,} disponibles este mes en "
-                "la cuenta compartida de Ahrefs. Reduce el máximo de keywords "
-                "o espera al próximo ciclo de facturación.")
-            st.stop()
+                "la cuenta de Ahrefs. Continuando de todas formas.")
 
         try:
             dominios = []
