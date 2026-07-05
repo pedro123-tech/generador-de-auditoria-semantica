@@ -1,0 +1,23 @@
+# Secretos: nunca subir claves reales.
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+!.streamlit/secrets.toml.example
+*.pem
+*.key
+
+# Entorno / artefactos de Python.
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Salidas generadas (no son código fuente).
+*.xlsx
+!plantilla*.xlsx
+
+# Config local de herramientas (Claude Code, editores, etc.), no del proyecto.
+.claude/
+.vscode/
+.idea/

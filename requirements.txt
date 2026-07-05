@@ -1,0 +1,10 @@
+streamlit==1.58.0
+openpyxl==3.1.5
+requests==2.34.2
+python-dotenv==1.2.2
+pillow==12.2.0
+
+# Proveedores de IA (opcionales; solo se importan si se usa su key)
+anthropic==0.39.0
+openai==1.54.0
+google-generativeai==0.8.3
