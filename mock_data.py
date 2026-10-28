@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Datos de ejemplo (demo) para probar el generador sin gastar unidades de Ahrefs.
+"""Datos de ejemplo (demo) para probar el generador sin gastar saldo de DataForSEO.
 
 Genera keywords sinteticas pero realistas del sector logistico para los 5
-dominios, con la misma forma que devolveria Ahrefs.
+dominios, con la misma forma que devolveria DataForSEO.
 """
 from __future__ import annotations
 import random

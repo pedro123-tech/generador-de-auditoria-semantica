@@ -9,9 +9,9 @@ import datetime as dt
 import streamlit as st
 from dotenv import load_dotenv
 
-import ahrefs
 import build_excel
 import categorizar
+import dataforseo
 
 load_dotenv()
 
@@ -47,13 +47,9 @@ def _get_secret(name: str, default: str = "") -> str:
         return default
 
 
-AHREFS_KEY = _get_secret("AHREFS_API_KEY")
+DFS_LOGIN = _get_secret("DATAFORSEO_LOGIN")
+DFS_PASSWORD = _get_secret("DATAFORSEO_PASSWORD")
 APP_PASSWORD = _get_secret("APP_PASSWORD")
-# Tope de unidades de Ahrefs que se permite consumir en una sola ejecución,
-# para que ningún uso individual agote la cuota mensual compartida por todo
-# el equipo. Configurable vía entorno/secrets; con un valor conservador por
-# defecto.
-MAX_UNITS_PER_RUN = int(_get_secret("MAX_UNITS_PER_RUN", "150000"))
 
 
 def _check_password() -> bool:
@@ -119,9 +115,10 @@ with col_opts:
     pais = st.selectbox("País", list(PAISES.keys()), index=0)
     o1, o2 = st.columns([1, 1])
     limite = o1.number_input("Máx. keywords", 100, SIN_LIMITE, 2000, step=500,
-                             help="Solo controla coste y velocidad (~40 unidades de "
-                                  "Ahrefs por keyword). La herramienta pagina "
-                                  "automáticamente por encima de 250.")
+                             help="Solo controla coste y velocidad (~0,12 $ por "
+                                  "cada 1000 keywords y dominio en DataForSEO). "
+                                  "La herramienta pagina automáticamente por "
+                                  "encima de 1000.")
     sin_limite = o2.checkbox("Sin límite", value=False,
                              help="Trae todas las keywords del dominio.")
     ia_key = st.text_input("API key de IA (opcional)", type="password",
@@ -142,57 +139,48 @@ if generar:
         if not cliente[0] or not cliente[1]:
             st.error("Falta el nombre o la URL del cliente.")
             st.stop()
-        if not AHREFS_KEY:
-            st.error("No hay AHREFS_API_KEY configurada (.env o secrets).")
+        if not DFS_LOGIN or not DFS_PASSWORD:
+            st.error("Faltan DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD (.env o secrets).")
             st.stop()
 
         todos = [cliente] + competidores
         n_dom = sum(1 for etq, url in todos if etq and url)
 
         # Aviso de gasto (NO bloquea, solo informa): antes de lanzar las
-        # peticiones se estima el coste maximo y se compara con (a) el umbral
-        # configurado y (b) las unidades que de verdad quedan este mes en la
-        # cuenta de Ahrefs. Por decision explicita del usuario, esto nunca
-        # detiene la ejecucion — solo avisa para que se pueda decidir con
-        # informacion, ya que el limite de keywords lo controla el propio
-        # usuario y es su cuota la que está en juego.
-        coste_estimado = limite_efectivo * n_dom * ahrefs.UNIDADES_POR_KEYWORD
-        if coste_estimado > MAX_UNITS_PER_RUN:
-            st.warning(
-                f"Esta ejecución podría consumir hasta ~{coste_estimado:,} "
-                f"unidades de Ahrefs (umbral de aviso: {MAX_UNITS_PER_RUN:,}). "
-                "Continuando de todas formas.")
-
+        # peticiones se estima el coste maximo y se compara con el saldo que
+        # de verdad queda en la cuenta de DataForSEO. Por decision explicita
+        # del usuario, esto nunca detiene la ejecucion — solo avisa para que
+        # se pueda decidir con informacion.
+        coste = dataforseo.coste_estimado(limite_efectivo, n_dom)
         try:
-            cuota = ahrefs.unidades_disponibles(AHREFS_KEY)
-            restante = (cuota.get("units_limit_workspace", 0)
-                       - cuota.get("units_usage_workspace", 0))
+            saldo = dataforseo.saldo_disponible(DFS_LOGIN, DFS_PASSWORD)
         except Exception:
-            logger.exception("No se pudo consultar la cuota de Ahrefs")
-            restante = None
+            logger.exception("No se pudo consultar el saldo de DataForSEO")
+            saldo = None
 
-        if restante is not None and coste_estimado > restante:
+        if saldo is not None and coste > saldo:
             st.warning(
-                f"Esta auditoría podría necesitar hasta ~{coste_estimado:,} "
-                f"unidades y solo quedan {restante:,} disponibles este mes en "
-                "la cuenta de Ahrefs. Continuando de todas formas.")
+                f"Esta auditoría podría costar hasta ~{coste:.2f} $ y solo "
+                f"quedan {saldo:.2f} $ de saldo en DataForSEO. Continuando "
+                "de todas formas.")
 
         try:
             dominios = []
-            prog = st.progress(0.0, text="Descargando keywords de Ahrefs…")
+            prog = st.progress(0.0, text="Descargando keywords de DataForSEO…")
             hechos = 0
             for etq, url in todos:
                 if not etq or not url:
                     continue
-                dominios.append(ahrefs.fetch_dominio(
-                    AHREFS_KEY, etq, url, country=country, limit=limite_efectivo))
+                dominios.append(dataforseo.fetch_dominio(
+                    DFS_LOGIN, DFS_PASSWORD, etq, url, country=country,
+                    limit=limite_efectivo))
                 hechos += 1
                 prog.progress(hechos / max(n_dom, 1), text=f"Descargado: {etq}")
             prog.empty()
 
             vacios = [d.etiqueta for d in dominios if not d.filas]
             if vacios:
-                st.warning("Sin datos de Ahrefs para: " + ", ".join(vacios))
+                st.warning("Sin datos de DataForSEO para: " + ", ".join(vacios))
 
             if con_categorias:
                 with st.spinner("Categorizando con IA…"):
@@ -215,13 +203,13 @@ if generar:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True)
 
-        except ahrefs.AhrefsUnitsError as e:
-            logger.warning("Ahrefs sin unidades: %s", e)
-            st.error("La cuenta de Ahrefs se ha quedado sin unidades de API este mes.")
-        except ahrefs.AhrefsError as e:
-            logger.warning("Error de Ahrefs: %s", e)
-            st.error("No se ha podido conectar con Ahrefs. Revisa la API key o "
-                     "inténtalo de nuevo en unos minutos.")
+        except dataforseo.DataForSEOSaldoError as e:
+            logger.warning("DataForSEO sin saldo: %s", e)
+            st.error("La cuenta de DataForSEO no tiene saldo suficiente. "
+                     "Recarga en app.dataforseo.com.")
+        except dataforseo.DataForSEOError as e:
+            logger.warning("Error de DataForSEO: %s", e)
+            st.error(f"No se ha podido obtener datos de DataForSEO: {e}")
         except Exception:  # noqa: BLE001
             # No se muestra el traceback crudo a quien usa la app compartida
             # (podría exponer rutas internas, versiones de librerías, etc.);

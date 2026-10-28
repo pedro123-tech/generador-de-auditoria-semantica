@@ -4,7 +4,8 @@ Herramienta web que, a partir de **5 dominios** (1 cliente + 4 competidores),
 genera un **Excel de auditoría semántica SEO** con la misma estructura y estilo
 que la plantilla de referencia, de forma automática.
 
-- **Datos:** Ahrefs API v3 · `site-explorer/organic-keywords` (`mode=subdomains`).
+- **Datos:** DataForSEO Labs API · Google `ranked_keywords/live` (Competitor Research).
+- **Marca / No marca:** regex con el nombre del dominio y de la marca (`dataforseo.terminos_marca`).
 - **Categorización:** IA opcional (Anthropic / OpenAI / Gemini, autodetectada por la key).
 - **Excel:** `openpyxl` — hojas por dominio, análisis comparativo con gráficos,
   matriz global y hoja *Keyword Research* con `VLOOKUP` vivo y formato condicional.
@@ -13,7 +14,7 @@ que la plantilla de referencia, de forma automática.
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env      # y rellena AHREFS_API_KEY
+cp .env.example .env      # y rellena DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD
 ```
 
 ## Uso
@@ -25,15 +26,16 @@ streamlit run app.py
 Abre <http://localhost:8501>. Rellena cliente + 4 competidores, país y (opcional)
 la API key de IA para las categorías. Pulsa **Crear auditoría semántica** y descarga el `.xlsx`.
 
-- **Máx. keywords:** controla velocidad y coste (Ahrefs cobra ~40 unidades por
-  keyword). La herramienta pagina automáticamente por encima de 250 filas.
+- **Máx. keywords:** controla velocidad y coste (DataForSEO cobra 0,012 $ por
+  petición + 0,00012 $ por keyword: ~0,13 $ por cada 1000 keywords y dominio).
+  La herramienta pagina automáticamente por encima de 1000 filas.
 
 ## Estructura
 
 | Archivo | Rol |
 |---|---|
-| `app.py` | Interfaz Streamlit + control de acceso y de cuota |
-| `ahrefs.py` | Cliente de Ahrefs (paginación, fecha con datos, saneo de entrada) |
+| `app.py` | Interfaz Streamlit + control de acceso y aviso de saldo |
+| `dataforseo.py` | Cliente de DataForSEO (paginación, regex de marca, saneo de entrada) |
 | `categorizar.py` | Categorización IA por lotes (JSON), 3 proveedores |
 | `build_excel.py` | Motor openpyxl que reconstruye toda la plantilla |
 | `modelo.py` | Modelo de datos + saneo anti-inyección de fórmulas |
@@ -45,7 +47,7 @@ la vez. Ten en cuenta lo siguiente:
 
 ### Secretos
 
-- Las claves (`AHREFS_API_KEY`, key de IA, `APP_PASSWORD`) se leen **solo**
+- Las claves (`DATAFORSEO_LOGIN`/`DATAFORSEO_PASSWORD`, key de IA, `APP_PASSWORD`) se leen **solo**
   de variables de entorno o de `st.secrets`. El código nunca tiene una clave
   ni un valor por defecto hardcodeado.
 - En local: `.env` (a partir de `.env.example`). En despliegue (Streamlit
@@ -56,28 +58,26 @@ la vez. Ten en cuenta lo siguiente:
   contienen secretos reales.
 - Si alguna vez pegas una API key real en un chat, un issue, un commit o
   cualquier sitio fuera de tu gestor de secretos: **considérala expuesta y
-  rótala** en el panel del proveedor (Ahrefs / Anthropic / OpenAI / Google),
+  rótala** en el panel del proveedor (DataForSEO / Anthropic / OpenAI / Google),
   aunque solo haya estado ahí un momento.
 
 ### Contraseña de acceso compartido
 
 - Configura `APP_PASSWORD` antes de compartir el link con el equipo. Sin
-  ella, cualquiera con la URL puede usar la herramienta y consumir la cuota
-  de Ahrefs. La app avisa explícitamente si detecta que no está configurada.
+  ella, cualquiera con la URL puede usar la herramienta y gastar el saldo
+  de DataForSEO. La app avisa explícitamente si detecta que no está configurada.
 
-### Cuota de Ahrefs compartida
+### Saldo de DataForSEO compartido
 
-- La cuenta de Ahrefs tiene un límite mensual de unidades **compartido por
-  todo el equipo**. Cada keyword solicitada cuesta ~40 unidades.
+- DataForSEO es prepago: el saldo de la cuenta es **compartido por todo el
+  equipo** y cada auditoría lo descuenta.
 - Antes de lanzar una ejecución, la app estima el coste máximo y lo compara
-  con: (a) un tope configurable por ejecución (`MAX_UNITS_PER_RUN`, 150.000
-  por defecto) y (b) las unidades que quedan de verdad ese mes en la cuenta
-  (consultado en vivo a Ahrefs). Si se supera cualquiera de los dos, la
-  ejecución se bloquea con un aviso claro en vez de lanzar las peticiones.
+  con el saldo real de la cuenta (consultado en vivo, gratis). Si no llega,
+  avisa, pero no bloquea la ejecución.
 
 ### Excel generado
 
-- Todo texto que llega de fuentes externas (keywords y URLs de Ahrefs,
+- Todo texto que llega de fuentes externas (keywords y URLs de DataForSEO,
   categorías generadas por IA, nombres/URLs que teclea el usuario) se pasa
   por `modelo.sanear_texto()` antes de escribirse en una celda: si empieza
   por `=`, `+`, `-`, `@`, tabulador o retorno de carro, se neutraliza con un
@@ -97,8 +97,9 @@ la vez. Ten en cuenta lo siguiente:
 
 ## Notas
 
-- La `date` de Ahrefs se detecta automáticamente hacia atrás (el mes en curso
-  no está indexado). Se usa un `select` gratuito para ese sondeo (0 unidades).
+- Marca / No marca: una keyword es de marca si contiene el nombre del dominio
+  ("duplalogistics"), el nombre completo de la marca compactado o su primera
+  palabra si es distintiva ("dupla"; no se usan genéricas como "grupo").
 - *Keyword Research* y las hojas de análisis usan fórmulas vivas
   (`COUNTIF`/`SUMIF`/`VLOOKUP`), no valores precalculados.
 

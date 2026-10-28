@@ -17,7 +17,7 @@ def sanear_texto(valor):
     acabe en una celda o se interpole en una formula del Excel generado.
 
     Se aplica en las fronteras de entrada de datos no confiables: la
-    respuesta de la API de Ahrefs, la respuesta del proveedor de IA, y los
+    respuesta de la API de DataForSEO, la respuesta del proveedor de IA, y los
     nombres/URLs que teclea el usuario en la interfaz.
     """
     if isinstance(valor, str) and valor.startswith(_PREFIJOS_PELIGROSOS):
@@ -31,9 +31,9 @@ class KeywordRow:
     keyword: str
     volumen: Optional[int]
     kd: Optional[int]              # keyword difficulty
-    posicion: Optional[int]       # best_position
-    url: str                      # best_position_url
-    sum_traffic: int              # tráfico absoluto (para calcular %)
+    posicion: Optional[int]       # mejor posición orgánica
+    url: str                      # URL que posiciona
+    sum_traffic: float            # tráfico estimado (para calcular %)
     marca: str                    # "Marca" / "No marca"
     intencion: str = ""           # vacío por defecto
     categoria: str = ""           # rellena la IA
