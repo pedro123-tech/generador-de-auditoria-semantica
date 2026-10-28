@@ -67,7 +67,7 @@ def fetch_dominio(
     limit: int = 1000,
 ) -> Dominio:
     """Descarga las keywords orgánicas de un dominio y devuelve un `Dominio`."""
-    target = _target(url)
+    target = dominio_raiz(url)
     location_code, language_code = LOCALIZACIONES[country.lower()]
     terminos = terminos_marca(etiqueta, url)
 
@@ -161,7 +161,7 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in t if not unicodedata.combining(c))
 
 
-def _compacto(texto: str) -> str:
+def compacto(texto: str) -> str:
     """Normalizado y sin nada que no sea letra o numero ("Dupla-Logistics" -> "duplalogistics")."""
     return re.sub(r"[^a-z0-9]", "", _normalizar(texto))
 
@@ -174,15 +174,10 @@ def terminos_marca(etiqueta: str, url: str) -> list[str]:
     - La primera palabra del nombre si es distintiva (>= 4 letras y no
       generica), para captar busquedas cortas como "dupla".
     """
-    terminos = {_compacto(etiqueta)}
-    partes = _target(url).split(".")
-    if len(partes) >= 3 and partes[-2] in _SLD_GENERICOS:
-        terminos.add(_compacto(partes[-3]))
-    elif len(partes) >= 2:
-        terminos.add(_compacto(partes[-2]))
+    terminos = {compacto(etiqueta), compacto(etiqueta_dominio(url))}
     palabras = _normalizar(etiqueta).split()
     if palabras:
-        primera = _compacto(palabras[0])
+        primera = compacto(palabras[0])
         if len(primera) >= 4 and primera not in _GENERICAS:
             terminos.add(primera)
     return sorted(t for t in terminos if len(t) >= 3)
@@ -195,7 +190,7 @@ def es_marca(keyword: str, terminos: list[str]) -> bool:
     "dupla logistics" y "duplalogistics" coinciden); los de una sola palabra
     corta se buscan como palabra completa para no marcar falsos positivos.
     """
-    compacta = _compacto(keyword)
+    compacta = compacto(keyword)
     palabras = set(re.findall(r"[a-z0-9]+", _normalizar(keyword)))
     for t in terminos:
         if len(t) >= 6 and t in compacta:
@@ -205,7 +200,15 @@ def es_marca(keyword: str, terminos: list[str]) -> bool:
     return False
 
 
-def _target(url: str) -> str:
+def etiqueta_dominio(url: str) -> str:
+    """Parte del dominio que es la marca ("www.dupla-logistics.co.uk" -> "dupla-logistics")."""
+    partes = dominio_raiz(url).split(".")
+    if len(partes) >= 3 and partes[-2] in _SLD_GENERICOS:
+        return partes[-3]
+    return partes[-2] if len(partes) >= 2 else partes[0]
+
+
+def dominio_raiz(url: str) -> str:
     """Normaliza una URL a dominio raiz.
 
     DataForSEO exige el dominio sin "https://" ni "www." (con ellos lo
@@ -215,7 +218,7 @@ def _target(url: str) -> str:
     for pref in ("https://", "http://"):
         if t.startswith(pref):
             t = t[len(pref):]
-    t = t.split("/")[0].split("?")[0]   # fuera ruta y query
+    t = t.split("/")[0].split("?")[0].split(":")[0]   # fuera ruta, query y puerto
     if t.startswith("www."):
         t = t[4:]
     return t

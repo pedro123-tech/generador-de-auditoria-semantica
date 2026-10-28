@@ -23,8 +23,10 @@ cp .env.example .env      # y rellena DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD
 streamlit run app.py
 ```
 
-Abre <http://localhost:8501>. Rellena cliente + 4 competidores, país y (opcional)
-la API key de IA para las categorías. Pulsa **Crear auditoría semántica** y descarga el `.xlsx`.
+Abre <http://localhost:8501>. Pega el dominio del cliente y de hasta 4
+competidores (el nombre de cada marca, que da nombre a sus hojas del Excel, se
+detecta solo a partir de la web: `og:site_name` o `<title>`, y si no, del
+propio dominio), elige país y (opcional) la API key de IA para las categorías. Pulsa **Crear auditoría semántica** y descarga el `.xlsx`.
 
 - **Máx. keywords:** controla velocidad y coste (DataForSEO cobra 0,012 $ por
   petición + 0,00012 $ por keyword: ~0,13 $ por cada 1000 keywords y dominio).
@@ -36,6 +38,8 @@ la API key de IA para las categorías. Pulsa **Crear auditoría semántica** y d
 |---|---|
 | `app.py` | Interfaz Streamlit + control de acceso y aviso de saldo |
 | `dataforseo.py` | Cliente de DataForSEO (paginación, regex de marca, saneo de entrada) |
+| `nombres.py` | Detección del nombre de marca a partir del dominio |
+| `.streamlit/config.toml` | Tema visual (colores del panel Equipo SEO – Media Power) |
 | `categorizar.py` | Categorización IA por lotes (JSON), 3 proveedores |
 | `build_excel.py` | Motor openpyxl que reconstruye toda la plantilla |
 | `modelo.py` | Modelo de datos + saneo anti-inyección de fórmulas |

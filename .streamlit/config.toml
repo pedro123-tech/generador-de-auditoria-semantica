@@ -1,0 +1,15 @@
+# Tema visual de la app: mismos colores que el panel "Equipo SEO – Media Power"
+# (fondo navy casi negro, tarjetas con borde fino y acento amarillo).
+[theme]
+base = "dark"
+primaryColor = "#FFD43B"
+backgroundColor = "#0B0F19"
+secondaryBackgroundColor = "#121826"
+textColor = "#F4F5F7"
+borderColor = "#2A3142"
+linkColor = "#FFD43B"
+showWidgetBorder = true
+baseRadius = "10px"
+buttonRadius = "10px"
+font = "Inter, 'Segoe UI', sans-serif"
+headingFontWeights = [700, 700, 600, 600, 600, 600]

@@ -2,6 +2,7 @@
 """Interfaz Streamlit del Generador de Auditoría Semántica SEO."""
 from __future__ import annotations
 import hmac
+import html
 import logging
 import os
 import datetime as dt
@@ -12,23 +13,60 @@ from dotenv import load_dotenv
 import build_excel
 import categorizar
 import dataforseo
+import nombres
 
 load_dotenv()
 
 logger = logging.getLogger("auditoria_semantica")
 logging.basicConfig(level=logging.INFO)
 
-st.set_page_config(page_title="Generador de Auditoría Semántica SEO",
-                   layout="wide")
+st.set_page_config(page_title="Auditoría Semántica SEO – Media Power",
+                   page_icon="⚡", layout="wide")
 
-# Compactar el layout: menos padding y menos aire entre widgets.
-st.markdown("""
+# Estilo del panel "Equipo SEO – Media Power": los colores base vienen de
+# .streamlit/config.toml; aqui solo la barra superior, las tarjetas y los
+# detalles que el tema de Streamlit no cubre.
+AMARILLO = "#FFD43B"
+st.markdown(f"""
 <style>
-.block-container {padding-top: 1.6rem; padding-bottom: 0.5rem; max-width: 1250px;}
-div[data-testid="stVerticalBlock"] {gap: 0.45rem;}
-h1 {font-size: 1.55rem; margin-bottom: 0;}
-div[data-testid="stWidgetLabel"] {margin-bottom: 0.1rem;}
+.block-container {{padding-top: 1.2rem; padding-bottom: 0.5rem; max-width: 1250px;}}
+div[data-testid="stVerticalBlock"] {{gap: 0.5rem;}}
+div[data-testid="stWidgetLabel"] {{margin-bottom: 0.1rem;}}
+header[data-testid="stHeader"] {{background: transparent;}}
+.mp-top {{display: flex; align-items: center; gap: 0.7rem; padding-bottom: 0.9rem;
+          margin-bottom: 1.4rem; border-bottom: 1px solid #1C2232;}}
+.mp-logo {{width: 34px; height: 34px; border-radius: 8px; background: {AMARILLO};
+           display: flex; align-items: center; justify-content: center;}}
+.mp-marca {{font-weight: 700; font-size: 1.02rem; color: #F4F5F7;}}
+.amarillo {{color: {AMARILLO};}}
+.mp-titulo {{font-size: 1.7rem; font-weight: 700; margin: 0; color: #F4F5F7;}}
+.mp-sub {{color: #8B93A7; font-size: 0.92rem; margin: 0.15rem 0 1.1rem 0;}}
+.mp-card-titulo {{font-weight: 700; font-size: 1.05rem; color: #F4F5F7; margin-bottom: 0.2rem;}}
+.mp-etq {{padding-top: 0.55rem; font-size: 0.9rem; color: #C9CEDA;}}
+.mp-nombre {{padding-top: 0.55rem; font-size: 0.9rem; color: {AMARILLO};
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}}
+.mp-nombre.vacio {{color: #4A5266;}}
+div[data-testid="stVerticalBlockBorderWrapper"] {{border-color: #2A3142;}}
+button[kind="primary"], button[data-testid="stBaseButton-primary"],
+div[data-testid="stDownloadButton"] button {{
+    background: {AMARILLO}; border-color: {AMARILLO}; color: #0B0F19; font-weight: 600;}}
+button[kind="primary"] p, button[data-testid="stBaseButton-primary"] p,
+div[data-testid="stDownloadButton"] button p {{color: #0B0F19; font-weight: 600;}}
 </style>
+""", unsafe_allow_html=True)
+
+_RAYO = ('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B0F19" '
+         'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">'
+         '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>')
+
+
+def _cabecera() -> None:
+    """Barra superior y titulo con la identidad del panel del equipo SEO."""
+    st.markdown(f"""
+<div class="mp-top"><div class="mp-logo">{_RAYO}</div>
+<span class="mp-marca">Equipo <span class="amarillo">SEO</span> – Media Power</span></div>
+<div class="mp-titulo">Auditoría semántica – <span class="amarillo">Media Power</span></div>
+<div class="mp-sub">1 cliente + 4 competidores · Excel de auditoría automático</div>
 """, unsafe_allow_html=True)
 
 
@@ -68,7 +106,7 @@ def _check_password() -> bool:
                    "instancia compartida con el equipo.", icon="⚠️")
         return True
 
-    st.title("Generador de Auditoría Semántica SEO")
+    _cabecera()
     with st.form("login"):
         pwd = st.text_input("Contraseña de acceso", type="password")
         entrar = st.form_submit_button("Entrar")
@@ -91,27 +129,38 @@ PAISES = {"España (ES)": "es", "México (MX)": "mx", "Argentina (AR)": "ar",
 
 SIN_LIMITE = 100000
 
-st.title("Generador de Auditoría Semántica SEO")
-st.caption("1 cliente + 4 competidores · Excel de auditoría automático")
+
+@st.cache_data(ttl=24 * 3600, show_spinner="Detectando nombre…")
+def _nombre_de(url: str) -> str:
+    return nombres.detectar_nombre(url)
+
+
+_cabecera()
 
 col_dom, col_opts = st.columns([2.1, 1], gap="large")
 
-with col_dom:
-    st.markdown("**Dominios**")
+with col_dom, st.container(border=True):
+    st.markdown("<div class='mp-card-titulo'>Dominios</div>", unsafe_allow_html=True)
+    st.caption("Pega solo el dominio: el nombre de cada marca (y de sus hojas "
+               "en el Excel) se detecta automáticamente.")
     etiquetas = ["Cliente", "Comp. 1", "Comp. 2", "Comp. 3", "Comp. 4"]
     entradas = []
     for i, etq in enumerate(etiquetas):
-        c0, c1, c2 = st.columns([0.55, 1, 1.6])
-        c0.markdown(f"<div style='padding-top:0.55rem;font-size:0.9rem'>{etq}</div>",
-                    unsafe_allow_html=True)
-        n = c1.text_input("Nombre", key=f"n{i}", placeholder="Nombre",
-                          label_visibility="collapsed")
-        u = c2.text_input("URL", key=f"u{i}", placeholder="https://…",
-                          label_visibility="collapsed")
+        c0, c1, c2 = st.columns([0.5, 1.7, 1])
+        c0.markdown(f"<div class='mp-etq'>{etq}</div>", unsafe_allow_html=True)
+        u = c1.text_input("URL", key=f"u{i}", placeholder="dominio.com",
+                          label_visibility="collapsed").strip()
+        n = _nombre_de(u) if "." in u else ""
+        # El nombre viene de la web del dominio: se escapa antes de pintarlo
+        # como HTML.
+        c2.markdown(
+            f"<div class='mp-nombre'>→ {html.escape(n)}</div>" if n
+            else "<div class='mp-nombre vacio'>→ nombre</div>",
+            unsafe_allow_html=True)
         entradas.append((n, u))
 
-with col_opts:
-    st.markdown("**Opciones**")
+with col_opts, st.container(border=True):
+    st.markdown("<div class='mp-card-titulo'>Opciones</div>", unsafe_allow_html=True)
     pais = st.selectbox("País", list(PAISES.keys()), index=0)
     o1, o2 = st.columns([1, 1])
     limite = o1.number_input("Máx. keywords", 100, SIN_LIMITE, 2000, step=500,
@@ -129,15 +178,15 @@ with col_opts:
     resultado = st.container()
 
 if generar:
-    cliente = (entradas[0][0].strip(), entradas[0][1].strip())
-    competidores = [(n.strip(), u.strip()) for n, u in entradas[1:]]
+    cliente = entradas[0]
+    competidores = entradas[1:]
     country = PAISES[pais]
     con_categorias = bool(ia_key.strip())
     limite_efectivo = SIN_LIMITE if sin_limite else int(limite)
 
     with resultado:
         if not cliente[0] or not cliente[1]:
-            st.error("Falta el nombre o la URL del cliente.")
+            st.error("Falta el dominio del cliente.")
             st.stop()
         if not DFS_LOGIN or not DFS_PASSWORD:
             st.error("Faltan DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD (.env o secrets).")
@@ -198,7 +247,7 @@ if generar:
             st.success(f"Auditoría generada · {len(dominios)} dominios · {total_kw} keywords")
             fecha = dt.date.today().isoformat()
             st.download_button(
-                "Descargar auditoría (.xlsx)", data=data,
+                "Descargar auditoría (.xlsx)", data=data, type="primary",
                 file_name=f"Auditoria_Semantica_{build_excel._safe(cliente[0])}_{fecha}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True)
